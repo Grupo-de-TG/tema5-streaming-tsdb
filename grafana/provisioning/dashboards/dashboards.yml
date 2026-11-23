@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: "Tema 5"
+    orgId: 1
+    folder: "Tema 5 - Streaming TSDB"
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

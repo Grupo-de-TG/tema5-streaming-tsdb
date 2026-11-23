@@ -1,0 +1,109 @@
+{
+  "uid": "tema5-stream-qoe",
+  "title": "Tema 5 — Telemetria de Reprodução, Buffer e Stream",
+  "tags": ["tema5", "tsdb", "streaming", "qoe"],
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Bitrate Médio (kbps) por Resolução (ABR)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-tema5" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "query": "SELECT mean(\"bitrate_kbps\") FROM \"raw_7d\".\"stream_metrics\" WHERE $timeFilter GROUP BY time(5s), \"resolution\" fill(null)",
+          "resultFormat": "time_series",
+          "alias": "$tag_resolution"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "kbps" } }
+    },
+    {
+      "id": 2,
+      "title": "Eventos de Buffer & Quedas de Conexão (por 10s)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-tema5" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "query": "SELECT sum(\"is_buffer_event\") AS \"Buffer Events\", sum(\"is_drop_event\") AS \"Connection Drops\" FROM \"raw_7d\".\"stream_metrics\" WHERE $timeFilter GROUP BY time(10s) fill(0)",
+          "resultFormat": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Buffer Health Médio (segundos pré-carregados)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 8, "h": 7 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-tema5" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "query": "SELECT mean(\"buffer_health_s\") FROM \"raw_7d\".\"stream_metrics\" WHERE $timeFilter GROUP BY time(5s), \"network\" fill(null)",
+          "resultFormat": "time_series",
+          "alias": "$tag_network"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 4,
+      "title": "Latência p95 por CDN Node (ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 8, "w": 8, "h": 7 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-tema5" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "query": "SELECT percentile(\"latency_ms\", 95) FROM \"raw_7d\".\"stream_metrics\" WHERE $timeFilter GROUP BY time(10s), \"cdn_node\" fill(null)",
+          "resultFormat": "time_series",
+          "alias": "$tag_cdn_node"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 5,
+      "title": "Frames Perdidos (Gargalo de Player / Transcode)",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 8, "w": 8, "h": 7 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-tema5" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "query": "SELECT sum(\"dropped_frames\") FROM \"raw_7d\".\"stream_metrics\" WHERE $timeFilter GROUP BY time(10s), \"cdn_node\" fill(0)",
+          "resultFormat": "time_series",
+          "alias": "$tag_cdn_node"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Downsampling: Série Agregada 1m (agg_1y)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 6 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-tema5" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "query": "SELECT mean(\"mean_bitrate_kbps\") FROM \"agg_1y\".\"stream_metrics_1m\" WHERE $timeFilter GROUP BY time(1m), \"cdn_node\" fill(null)",
+          "resultFormat": "time_series",
+          "alias": "$tag_cdn_node (1m agg)"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "kbps" } }
+    }
+  ]
+}

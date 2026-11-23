@@ -1,0 +1,13 @@
+apiVersion: 1
+datasources:
+  - name: InfluxDB-Tema5
+    uid: influxdb-tema5
+    type: influxdb
+    access: proxy
+    url: http://tema5-influxdb:8086
+    database: stream_telemetry
+    user: admin
+    secureJsonData:
+      password: adminpass
+    isDefault: true
+    editable: true

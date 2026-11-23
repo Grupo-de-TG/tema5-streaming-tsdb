@@ -1,0 +1,69 @@
+volumes:
+  tema5_influxdb_data:
+  tema5_grafana_data:
+
+networks:
+  streaming_net:
+    external: true
+
+services:
+  tema5-influxdb:
+    image: influxdb:1.8
+    container_name: tema5-influxdb
+    restart: unless-stopped
+    ports:
+      - "8089:8086"
+    environment:
+      - INFLUXDB_DB=stream_telemetry
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=adminpass
+    volumes:
+      - tema5_influxdb_data:/var/lib/influxdb
+    networks:
+      - streaming_net
+
+  tema5-ingest:
+    build: ./ingest
+    container_name: tema5-ingest
+    restart: unless-stopped
+    depends_on:
+      - tema5-influxdb
+    ports:
+      - "8091:8091"
+    environment:
+      - INGEST_PORT=8091
+      - INFLUX_WRITE_URL=http://tema5-influxdb:8086/write?db=stream_telemetry&u=admin&p=adminpass
+      - INFLUX_QUERY_URL=http://tema5-influxdb:8086/query?db=stream_telemetry&u=admin&p=adminpass
+    networks:
+      - streaming_net
+
+  tema5-grafana:
+    image: grafana/grafana:latest
+    container_name: tema5-grafana
+    restart: unless-stopped
+    depends_on:
+      - tema5-influxdb
+    ports:
+      - "3006:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - tema5_grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - streaming_net
+
+  tema5-simulator:
+    build: ./simulator
+    container_name: tema5-simulator
+    profiles: ["mock"]
+    depends_on:
+      - tema5-ingest
+    environment:
+      - TELEMETRY_URL=http://tema5-ingest:8091/api/v1/telemetry
+    networks:
+      - streaming_net
