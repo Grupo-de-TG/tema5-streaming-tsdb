@@ -214,9 +214,48 @@ class TelemetryHandler(BaseHTTPRequestHandler):
         self.send_json({"status": "accepted", "count": accepted}, 202)
 
 
+def _ensure_influx_policies() -> None:
+    """Garante de forma idempotente que o DB, RPs (raw_7d/agg_1y) e CQ existam."""
+    base_query_url = INFLUX_QUERY_URL.split("?")[0]
+    auth_qs = urllib.parse.urlencode({"u": "admin", "p": "adminpass"})
+    queries = [
+        'CREATE DATABASE "stream_telemetry"',
+        'CREATE RETENTION POLICY "raw_7d" ON "stream_telemetry" DURATION 7d REPLICATION 1 DEFAULT',
+        'CREATE RETENTION POLICY "agg_1y" ON "stream_telemetry" DURATION 365d REPLICATION 1',
+        (
+            'CREATE CONTINUOUS QUERY "cq_stream_1m" ON "stream_telemetry" BEGIN '
+            'SELECT mean("bitrate_kbps") AS "mean_bitrate_kbps", '
+            'min("buffer_health_s") AS "min_buffer_health_s", '
+            'sum("rebuffer_ms") AS "sum_rebuffer_ms", '
+            'sum("dropped_frames") AS "sum_dropped_frames", '
+            'mean("latency_ms") AS "mean_latency_ms", '
+            'percentile("latency_ms", 95) AS "p95_latency_ms", '
+            'sum("is_buffer_event") AS "buffer_events", '
+            'sum("is_drop_event") AS "connection_drops" '
+            'INTO "stream_telemetry"."agg_1y"."stream_metrics_1m" '
+            'FROM "stream_telemetry"."raw_7d"."stream_metrics" '
+            'GROUP BY time(1m), "cdn_node", "network", "resolution" END'
+        ),
+    ]
+    for attempt in range(15):
+        try:
+            for q in queries:
+                data = urllib.parse.urlencode({"q": q}).encode("utf-8")
+                req = urllib.request.Request(f"{base_query_url}?{auth_qs}", data=data, method="POST")
+                with urllib.request.urlopen(req, timeout=3.0):
+                    pass
+            print("[tema5-ingest] InfluxDB RPs (raw_7d, agg_1y) e CQ (cq_stream_1m) verificadas.", flush=True)
+            return
+        except Exception as e:
+            if attempt == 14:
+                print(f"[tema5-ingest] Aviso ao inicializar RPs do InfluxDB: {e}", flush=True)
+            time.sleep(2.0)
+
+
 def main() -> None:
     t = threading.Thread(target=_flush_worker, daemon=True)
     t.start()
+    threading.Thread(target=_ensure_influx_policies, daemon=True).start()
     print(f"[tema5-ingest] Listening on 0.0.0.0:{PORT}", flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), TelemetryHandler).serve_forever()
 

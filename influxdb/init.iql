@@ -1,0 +1,16 @@
+CREATE DATABASE "stream_telemetry";
+CREATE RETENTION POLICY "raw_7d" ON "stream_telemetry" DURATION 7d REPLICATION 1 DEFAULT;
+CREATE RETENTION POLICY "agg_1y" ON "stream_telemetry" DURATION 365d REPLICATION 1;
+CREATE CONTINUOUS QUERY "cq_stream_1m" ON "stream_telemetry" BEGIN
+  SELECT mean("bitrate_kbps") AS "mean_bitrate_kbps",
+         min("buffer_health_s") AS "min_buffer_health_s",
+         sum("rebuffer_ms") AS "sum_rebuffer_ms",
+         sum("dropped_frames") AS "sum_dropped_frames",
+         mean("latency_ms") AS "mean_latency_ms",
+         percentile("latency_ms", 95) AS "p95_latency_ms",
+         sum("is_buffer_event") AS "buffer_events",
+         sum("is_drop_event") AS "connection_drops"
+  INTO "stream_telemetry"."agg_1y"."stream_metrics_1m"
+  FROM "stream_telemetry"."raw_7d"."stream_metrics"
+  GROUP BY time(1m), "cdn_node", "network", "resolution"
+END;

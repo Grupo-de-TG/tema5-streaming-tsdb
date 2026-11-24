@@ -19,6 +19,7 @@ services:
       - INFLUXDB_ADMIN_PASSWORD=adminpass
     volumes:
       - tema5_influxdb_data:/var/lib/influxdb
+      - ./influxdb/init.iql:/docker-entrypoint-initdb.d/init.iql:ro
     networks:
       - streaming_net
 
